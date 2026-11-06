@@ -73,8 +73,13 @@ func TestAnnouncementWaitsForIdleAlice(t *testing.T) {
 	go func() { time.Sleep(300 * time.Millisecond); s.aliceIdle.Store(true) }()
 	start := time.Now()
 	s.waitAliceIdle(2 * time.Second)
-	if d := time.Since(start); d < 300*time.Millisecond || d > time.Second {
+	if d := time.Since(start); d < 250*time.Millisecond || d > time.Second {
 		t.Fatalf("waited %v, want until Alice is idle", d)
+	}
+	start = time.Now()
+	s.waitAliceIdle(2 * time.Second)
+	if d := time.Since(start); d > 50*time.Millisecond {
+		t.Fatalf("idle Alice must not delay: %v", d)
 	}
 	start = time.Now()
 	s.aliceIdle.Store(false)

@@ -366,7 +366,7 @@ func (s *Server) command(ctx context.Context, r request) response {
 			return response{State: &v}
 		}
 		cancelDialog()
-		s.waitAliceIdle(2 * time.Second)
+		time.Sleep(120 * time.Millisecond)
 		return s.command(ctx, request{Action: a, Query: q})
 	default:
 		return response{Error: "неизвестная команда"}
@@ -406,6 +406,8 @@ func (s *Server) startGuarded(offset int64, announce bool, attempt int, expected
 		if say {
 			go func() {
 				s.speechMu.Lock()
+				// Runs beside stream resolution, so waiting here costs no time.
+				s.waitAliceIdle(2 * time.Second)
 				if e := speak(announcement); e != nil {
 					log.Print("native announcement not confirmed")
 				}
@@ -748,9 +750,8 @@ func nativeVoiceTarget(query string) bool {
 }
 
 // waitAliceIdle lets a cancelled dialog finish before our announcement:
-// speech started while Alice is still leaving BUSY is cut after a syllable.
+// speech started while Alice is still leaving BUSY can be cut short.
 func (s *Server) waitAliceIdle(limit time.Duration) {
-	time.Sleep(120 * time.Millisecond)
 	for deadline := time.Now().Add(limit); !s.aliceIdle.Load() && time.Now().Before(deadline); {
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -809,7 +810,6 @@ func (s *Server) voiceLoop(ctx context.Context) {
 						go func() {
 							c, cancel := context.WithTimeout(ctx, 45*time.Second)
 							defer cancel()
-							s.waitAliceIdle(2 * time.Second)
 							if res := s.command(c, request{Action: action, Query: query}); res.Error != "" {
 								log.Print("voice takeover failed")
 							}
