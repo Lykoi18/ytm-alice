@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // Trimmed AliceResponse JSON in the shape captured on a Mini 2 (quasar 3.21).
 const (
@@ -61,5 +64,22 @@ func TestYouTubeOnlySetting(t *testing.T) {
 	r, err := configRequest([]string{"set", "youtube_only", "true"})
 	if err != nil || r.Settings == nil || r.Settings.YouTubeOnly == nil || !*r.Settings.YouTubeOnly {
 		t.Fatalf("youtube_only not settable: %+v %v", r.Settings, err)
+	}
+}
+
+func TestAnnouncementWaitsForIdleAlice(t *testing.T) {
+	s := &Server{}
+	s.aliceIdle.Store(false)
+	go func() { time.Sleep(300 * time.Millisecond); s.aliceIdle.Store(true) }()
+	start := time.Now()
+	s.waitAliceIdle(2 * time.Second)
+	if d := time.Since(start); d < 300*time.Millisecond || d > time.Second {
+		t.Fatalf("waited %v, want until Alice is idle", d)
+	}
+	start = time.Now()
+	s.aliceIdle.Store(false)
+	s.waitAliceIdle(200 * time.Millisecond)
+	if d := time.Since(start); d > time.Second {
+		t.Fatalf("no idle event must not block the command: %v", d)
 	}
 }
